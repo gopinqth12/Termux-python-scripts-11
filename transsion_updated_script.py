@@ -223,14 +223,36 @@ def browse_img(label):
             err(f"File not found — check path and try again")
 
 def check_device_adb():
-    ok_f, out = _run_check("adb devices")
-    lines = [l for l in out.strip().splitlines() if l and 'List' not in l]
-    return len(lines) > 0
+    """Returns True only when a real authorised device is present."""
+    _, out = _run_check("adb devices")
+    for line in out.splitlines():
+        line = line.strip()
+        if not line or 'list of devices' in line.lower():
+            continue
+        # "SERIAL\tdevice"  or  "SERIAL\trecovery"
+        parts = line.split('\t')
+        if len(parts) == 2 and parts[1].strip() in ('device', 'recovery', 'sideload'):
+            return True
+    return False
 
 def check_device_fastboot():
-    ok_f, out = _run_check("fastboot devices")
-    lines = [l for l in out.strip().splitlines() if l]
-    return len(lines) > 0
+    """Returns True only when a real fastboot device is present."""
+    _, out = _run_check("fastboot devices")
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # tab-separated:  "SERIAL\tfastboot"
+        if '\t' in line:
+            parts = line.split('\t')
+            if len(parts) >= 2 and 'fastboot' in parts[1].lower():
+                return True
+        # space-separated fallback some fastboot versions use
+        elif ' ' in line:
+            parts = line.split()
+            if len(parts) >= 2 and 'fastboot' in parts[-1].lower():
+                return True
+    return False
 
 def detect_brand(path):
     p = path.lower()
